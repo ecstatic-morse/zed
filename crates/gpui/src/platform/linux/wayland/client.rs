@@ -2426,6 +2426,7 @@ impl Dispatch<wl_touch::WlTouch, ()> for WaylandClientStatePtr {
                                         let input = PlatformInput::KeyDown(KeyDownEvent {
                                             keystroke,
                                             is_held: false,
+                                            prefer_character_input: false,
                                         });
 
                                         // Reset threshold after zoom
