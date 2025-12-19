@@ -39,6 +39,14 @@ impl Direction {
             Direction::Next => Direction::Prev,
         }
     }
+
+    pub const fn next_if(next: bool) -> Self {
+        if next {
+            Direction::Next
+        } else {
+            Direction::Prev
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
