@@ -335,6 +335,8 @@ impl BeamJumpState {
     }
 }
 
+const DEFAULT_DUPES_PENALTY: usize = 11;
+
 fn n_char_labels<'a>(
     n: LabelLen,
     all_chars: &'a [char],
@@ -348,7 +350,7 @@ fn n_char_labels<'a>(
                 .map(|&c| String::from(c)),
         ),
         LabelLen::Two => Either::Right(
-            two_char_labels(&all_chars, true)
+            two_char_labels(&all_chars, DEFAULT_DUPES_PENALTY)
                 .filter(move |&(c, _)| is_valid_first_char(c))
                 .map(|(c1, c2)| format!("{}{}", c1, c2)),
         ),
@@ -357,21 +359,26 @@ fn n_char_labels<'a>(
 
 // Order characters by the minimum sum of the indices of those characters in the input slice.
 // e.g. aa ab ba ac bb ca ad bc ... zx yz zy zz
-fn two_char_labels(all_chars: &[char], doubles_last: bool) -> impl Iterator<Item = (char, char)> {
+fn two_char_labels(all_chars: &[char], dupes_penalty: usize) -> impl Iterator<Item = (char, char)> {
     let last_idx = all_chars.len() - 1;
-    (0..=last_idx * 2)
+    let no_dupes = (0..=last_idx * 2)
         .flat_map(move |sum| {
             let start = sum.saturating_sub(last_idx);
             let end = std::cmp::min(sum, last_idx);
             (start..=end).map(move |i| (i, sum - i))
         })
-        .filter(move |&(i, j)| !(doubles_last && i == j))
+        .filter(move |&(i, j)| i != j);
+
+    let dupes = (0..all_chars.len()).map(|i| (i, i));
+
+    no_dupes
+        .merge_by(dupes, move |(a, b), (c, _)| {
+            (a + b)
+                .cmp(&(c + c + dupes_penalty))
+                .then_with(|| a.cmp(c))
+                .is_le()
+        })
         .map(move |(i, j)| (all_chars[i], all_chars[j]))
-        .chain(
-            if doubles_last { all_chars } else { &[] }
-                .iter()
-                .map(|&c| (c, c)),
-        )
 }
 
 #[cfg(test)]
@@ -380,7 +387,7 @@ mod tests {
 
     #[test]
     fn two_char_labels_ordering() {
-        let got: Vec<_> = two_char_labels(&['a', 'b', 'c', 'd', 'e'], false)
+        let got: Vec<_> = two_char_labels(&['a', 'b', 'c', 'd', 'e'], 0)
             .map(|(a, b)| format!("{a}{b}"))
             .collect();
         assert_eq!(&got[..5], &["aa", "ab", "ba", "ac", "bb"]);
@@ -389,11 +396,11 @@ mod tests {
 
     #[test]
     fn two_char_labels_ordering_with_doubles_last() {
-        let got: Vec<_> = two_char_labels(&['a', 'b', 'c', 'd', 'e'], true)
+        let got: Vec<_> = two_char_labels(&['a', 'b', 'c', 'd', 'e'], 1000)
             .map(|(a, b)| format!("{a}{b}"))
             .collect();
 
-        let expected: Vec<_> = two_char_labels(&['a', 'b', 'c', 'd', 'e'], false)
+        let expected: Vec<_> = two_char_labels(&['a', 'b', 'c', 'd', 'e'], 0)
             .sorted_by_key(|(a, b)| a == b)
             .map(|(a, b)| format!("{a}{b}"))
             .collect();
